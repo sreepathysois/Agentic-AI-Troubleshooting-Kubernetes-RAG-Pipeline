@@ -109,4 +109,17 @@ helm install loki grafana/loki-stack \
 
 kubectl logs -n loki -l app.kubernetes.io/name=promtail
 
-Promtail deployed as DaemonSet to tail pod logs
+Promtail deployed as DaemonSet to tail pod logs 
+
+
+
+#### Agenbt POST Requet to tes
+
+
+curl -X POST http://localhost:8001/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"alert_name":"PodImagePullError","instance":"pathy-7f884d8546-n69rs","namespace":"default","severity":"warning","timestamp":"2025-10-06T10:15:00Z"}'
+
+
+curl -X POST http://localhost:8000/alert      -H "Content-Type: application/json"      -d @sample_alert.json
+
