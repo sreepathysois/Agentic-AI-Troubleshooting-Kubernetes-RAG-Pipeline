@@ -1,0 +1,50 @@
+role: "Agent"
+
+daemonset:
+  enabled: true
+  updateStrategy:
+    type: RollingUpdate
+
+service:
+  enabled: false   # no service, avoids spec.ports error
+
+podLabels:
+  app: vector
+
+envFrom:
+  - secretRef:
+      name: minio-secret
+
+config: |
+  [sources.kubernetes_logs]
+  type = "kubernetes_logs"
+  include_paths_glob_patterns = ["/var/log/containers/*.log"]
+  ignore_older_secs = 600
+  host_key = "node"
+
+  [transforms.enrich_tags]
+  type = "remap"
+  inputs = ["kubernetes_logs"]
+  source = '''
+  .tags.cluster = "onprem-k8s"
+  .tags.source  = "vector"
+  .tags.env     = "dev"
+  '''
+
+  [sinks.minio]
+  type = "aws_s3"
+  inputs = ["enrich_tags"]
+  endpoint = "http://minio-service.observability.svc.cluster.local:9000"
+  bucket = "mylogs"
+  region = "us-east-1"
+  access_key_id = "${MINIO_ROOT_USER}"
+  secret_access_key = "${MINIO_ROOT_PASSWORD}"
+  compression = "gzip"
+  encoding.codec = "json"
+  healthcheck = true
+
+  [sinks.debug_console]
+  type = "console"
+  inputs = ["enrich_tags"]
+  encoding.codec = "json"
+

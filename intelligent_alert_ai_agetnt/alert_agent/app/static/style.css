@@ -1,0 +1,22 @@
+body {
+  font-family: monospace;
+  background: #0d0d0d;
+  color: #00ff88;
+  padding: 20px;
+}
+h2 {
+  color: #00ffff;
+  margin-bottom: 15px;
+}
+.event {
+  padding: 5px;
+  border-bottom: 1px solid #222;
+}
+#logbox {
+  background-color: #111;
+  padding: 10px;
+  border-radius: 6px;
+  height: 600px;
+  overflow-y: scroll;
+}
+

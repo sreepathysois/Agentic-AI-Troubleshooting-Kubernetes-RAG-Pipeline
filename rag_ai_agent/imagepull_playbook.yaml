@@ -1,0 +1,7 @@
+name: imagepull_backoff
+description: Check image name, registry credentials, imagePullSecrets, and node network.
+steps:
+  - kubectl describe pod {pod} -n {namespace}
+  - check image name and registry credentials
+  - update image tag or create imagePullSecrets
+  - kubectl delete pod {pod} -n {namespace}

@@ -1,0 +1,20 @@
+# alertmanager-config-discord.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-main
+  namespace: monitoring
+stringData:
+  alertmanager.yaml: |-
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: discord
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 3h
+    receivers:
+    - name: discord
+      webhook_configs:
+      - url: 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz'
+

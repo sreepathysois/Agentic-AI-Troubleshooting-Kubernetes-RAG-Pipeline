@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alert-agent-config
+  namespace: observability
+data:
+  MINIO_ENDPOINT: "http://minio-service.observability.svc.cluster.local:9000"
+  MINIO_ACCESS_KEY: "minioadmin"
+  MINIO_SECRET_KEY: "minioadmin123"
+  PROMETHEUS_URL: "http://prometheus-service.monitoring.svc.cluster.local:9090"
+  PG_HOST: "postgres-service.observability.svc.cluster.local"
+  PG_USER: "postgres"
+  PG_PASSWORD: "postgres123"
+  PG_DB: "observability"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-agent
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-agent
+  template:
+    metadata:
+      labels:
+        app: alert-agent
+    spec:
+      containers:
+        - name: alert-agent
+          image: <your-alert-agent-image>  # Docker image with FastAPI app
+          envFrom:
+            - configMapRef:
+                name: alert-agent-config
+          ports:
+            - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-agent-service
+  namespace: observability
+spec:
+  type: ClusterIP
+  selector:
+    app: alert-agent
+  ports:
+    - port: 8000
+      targetPort: 8000
+

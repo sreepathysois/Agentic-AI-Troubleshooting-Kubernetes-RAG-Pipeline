@@ -1,0 +1,4 @@
+ [sinks.debug_console]
+ type = "console"
+ inputs = ["enrich_tags"]
+ encoding.codec = "json"

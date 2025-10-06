@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: observability
+data:
+  vector.toml: |
+    [sources.kubernetes_logs]
+      type = "kubernetes_logs"
+
+    [transforms.enrich]
+      type = "remap"
+      inputs = ["kubernetes_logs"]
+      source = '''
+        .tags.app = .kubernetes.pod_labels.app
+        .tags.namespace = .kubernetes.namespace_name
+        .tags.node = .kubernetes.node_name
+        .tags.pod = .kubernetes.pod_name
+        .tags.timestamp = now()
+      '''
+
+    [sinks.minio]
+      type = "aws_s3"
+      inputs = ["enrich"]
+      bucket = "vector-logs"
+      region = "us-east-1"
+      endpoint = "http://minio.observability.svc.cluster.local:9000"
+      compression = "gzip"
+      encoding.codec = "json"
+      key_prefix = "k8s/logs/%Y/%m/%d/"
+      filename_append_uuid = true
+  
+
+    [sinks.minio.auth]
+      access_key_id = "${MINIO_ACCESS_KEY}"
+      secret_access_key = "${MINIO_SECRET_KEY}"
+

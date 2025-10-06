@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Alert Intelligence Agent Dashboard</title>
+  <meta http-equiv="refresh" content="3">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h2>🚀 Alert Intelligence Agent — Live Event Feed</h2>
+  <div id="logbox">
+    {% for event in events %}
+      <div class="event">{{ event }}</div>
+    {% endfor %}
+  </div>
+</body>
+</html>
+

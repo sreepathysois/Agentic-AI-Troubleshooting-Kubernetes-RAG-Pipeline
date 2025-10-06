@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+asyncpg
+psycopg2-binary
+boto3
+httpx
+pydantic
+sentence-transformers  # for embeddings
+pgvector
