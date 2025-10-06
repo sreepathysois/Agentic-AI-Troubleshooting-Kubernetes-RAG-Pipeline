@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-agent
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-agent
+  template:
+    metadata:
+      labels:
+        app: rag-agent
+    spec:
+      containers:
+      - name: rag-agent
+        image: sreedocker123/rag-agent:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8001
+        env:
+        - name: POSTGRES_URL
+          value: "postgresql://postgres:postgres123@postgres-service.observability.svc.cluster.local:5432/alerts"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openai-secret
+              key: api-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-agent
+  namespace: observability
+spec:
+  type: NodePort
+  selector:
+    app: rag-agent
+  ports:
+  - name: http
+    port: 8001
+    targetPort: 8001
+    nodePort: 30081
+
