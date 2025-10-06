@@ -1,0 +1,41 @@
+{
+  "receiver": "alert-agent",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PodImagePullError",
+        "severity": "warning",
+        "namespace": "default",
+        "pod": "sreepathy-f5fbc795-jth7m",
+        "instance": "sreepathy-f5fbc795-jth7m",
+        "reason": "ImagePullBackOff"
+      },
+      "annotations": {
+        "summary": "Pod image pull error detected",
+        "description": "Pod sreepathy-f5fbc795-jth7m in namespace default has failed to pull its container image. Check image name or registry credentials."
+      },
+      "startsAt": "2025-10-06T07:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus-server.monitoring.svc.cluster.local:9090/graph?g0.expr=kube_pod_container_status_waiting_reason%7Breason%3D%22ImagePullBackOff%22%7D&g0.tab=1",
+      "fingerprint": "7d8fe12a9f85a46c"
+    }
+  ],
+  "groupLabels": {
+    "alertname": "PodImagePullError"
+  },
+  "commonLabels": {
+    "alertname": "PodImagePullError",
+    "severity": "warning",
+    "namespace": "default"
+  },
+  "commonAnnotations": {
+    "summary": "Pod image pull error detected"
+  },
+  "externalURL": "http://alertmanager.monitoring.svc.cluster.local:9093",
+  "version": "4",
+  "groupKey": "{}/PodImagePullError",
+  "truncatedAlerts": 0
+}
+
