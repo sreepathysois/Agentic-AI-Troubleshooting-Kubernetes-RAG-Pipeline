@@ -238,8 +238,19 @@ async def analyze(payload: Dict[str, Any]):
 
     # Step 4: Build context and query LLM
     context = build_context(similar_rows, playbooks, current_alert)
-    add_event("🧠 Context built for LLM:")
-    add_event(context[:1000] + "..." if len(context) > 1000 else context)
+    #add_event("🧠 Context built for LLM:")
+    #add_event(context[:1000] + "..." if len(context) > 1000 else context)
+
+    # Display context (formatted and limited)
+    context_preview = context if len(context) < 5000 else context[:5000] + "\n\n...[truncated]..."
+
+    print("\n========================= 🧠 CONTEXT BUILT =========================")
+    print(context_preview)
+    print("==================================================================\n")
+
+    add_event("🧩 Context prepared for LLM:")
+    add_event("<pre style='font-size:12px;white-space:pre-wrap;max-height:400px;overflow:auto;'>" +
+           context_preview + "</pre>")
 
     llm_reply = await ask_llm(context)
 
