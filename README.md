@@ -124,5 +124,72 @@ curl -X POST http://localhost:8001/analyze \
 curl -X POST http://localhost:8000/alert      -H "Content-Type: application/json"      -d @sample_alert.json
 
 
-kubectl create secret generic openai-secret -n observability --from-literal=api-key="sk-your-real-api-key"
+kubectl create secret generic openai-secret -n observability --from-literal=api-key="sk-your-real-api-key"  
+
+
+### PG Vector Embedding
+
+🧱 alert_enriched Table Schema (PostgreSQL + pgvector)
+CREATE TABLE IF NOT EXISTS alert_enriched (
+    id SERIAL PRIMARY KEY,
+    alert_name TEXT,
+    severity TEXT,
+    instance TEXT,
+    namespace TEXT,
+    description TEXT,
+    logs TEXT,
+    metrics JSONB,
+    embedding vector(1536),  -- <-- pgvector column
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+✅ Notes:
+
+The vector(1536) requires the pgvector extension to be enabled:
+
+CREATE EXTENSION IF NOT EXISTS vector;
+
+
+metrics is stored as a JSONB field so you can run structured queries like:
+
+SELECT metrics->>'cpu_usage' AS cpu FROM alert_enriched;
+
+
+logs stores the enriched text blob fetched from MinIO.
+
+embedding holds the 1536-dimension float array from your LLM embedding.
+
+🧠 Example queries
+
+Insert (manual example):
+
+INSERT INTO alert_enriched (
+  alert_name, severity, instance, namespace, description, logs, metrics, embedding
+)
+VALUES (
+  'PodImagePullError',
+  'warning',
+  'sree-5765c8475f-dqvwn',
+  'default',
+  'Pod failed to pull image',
+  'Log snippet here...',
+  '{"cpu": 0.75, "memory": 512}',
+  '[0.1, 0.2, 0.3, ...]'::vector
+);
+
+
+Check latest alerts:
+
+SELECT id, alert_name, instance, namespace, created_at
+FROM alert_enriched
+ORDER BY created_at DESC
+LIMIT 10;
+
+
+Vector similarity query (for RAG agent):
+
+SELECT id, alert_name, instance, 1 - (embedding <=> '[0.1, 0.2, 0.3, ...]'::vector) AS similarity
+FROM alert_enriched
+ORDER BY embedding <=> '[0.1, 0.2, 0.3, ...]'::vector
+LIMIT 3;
 
