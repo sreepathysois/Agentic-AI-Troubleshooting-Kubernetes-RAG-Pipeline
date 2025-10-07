@@ -123,6 +123,9 @@ curl -X POST http://localhost:8001/analyze \
 
 curl -X POST http://localhost:8000/alert      -H "Content-Type: application/json"      -d @sample_alert.json
 
+kubectl run badpod --image=nginx:notfound -n default
+kubectl run crashpod --image=busybox --restart=Always -- sh -c "exit 1"
+
 
 kubectl create secret generic openai-secret -n observability --from-literal=api-key="sk-your-real-api-key"  
 
