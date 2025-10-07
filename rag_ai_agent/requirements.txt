@@ -7,4 +7,5 @@ sentence-transformers
 jinja2
 python-multipart
 openai   # optional if you use OpenAI
+sqlalchemy
 
