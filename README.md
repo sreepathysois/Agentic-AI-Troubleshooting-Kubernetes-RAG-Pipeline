@@ -219,4 +219,7 @@ Top-3 Similar Alerts:
 
 Playbook Excerpt:
 "Verify Docker credentials and image registry availability."
-...
+... 
+
+
+openapi : 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
