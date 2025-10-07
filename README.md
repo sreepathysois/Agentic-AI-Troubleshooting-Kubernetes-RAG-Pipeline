@@ -193,3 +193,27 @@ FROM alert_enriched
 ORDER BY embedding <=> '[0.1, 0.2, 0.3, ...]'::vector
 LIMIT 3;
 
+
+
+💡 Example output in your dashboard
+
+When an alert triggers, you’ll now see something like:
+
+🧩 Context prepared for LLM:
+Alert: PodImagePullError
+Severity: warning
+Namespace: default
+Pod: sree-5765c8475f-dqvwn
+Description: Pod failed to pull image due to invalid tag.
+
+Logs:
+[INFO] Trying to pull image...
+[ERROR] Failed to pull image: not found
+
+Top-3 Similar Alerts:
+1. CrashLoopBackOff in pod xyz (similarity 0.89)
+2. ImagePullBackOff in pod abc (similarity 0.82)
+
+Playbook Excerpt:
+"Verify Docker credentials and image registry availability."
+...
