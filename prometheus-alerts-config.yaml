@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: alertmanager-main
+  name: alertmanager-prometheus-kube-prometheus-alertmanager
   namespace: monitoring
 stringData:
   alertmanager.yaml: |-
@@ -9,29 +9,63 @@ stringData:
       resolve_timeout: 5m
 
     route:
-      receiver: "default"
+      receiver: "null"                        # default receiver = ignore system alerts
+      group_by: ['alertname']
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 3h
+
       routes:
+        # 🧠 Route AI-specific alerts (your custom PrometheusRule alerts)
+        - match:
+            ai_alert: "true"
+          receiver: "alert-agent"
+          continue: false
+
+        # 🎯 Explicit matches for key alerts if ai_alert label not set
         - match:
             alertname: "PodImagePullError"
           receiver: "alert-agent"
+          continue: false
+
+        - match:
+            alertname: "PodCrashLooping"
+          receiver: "alert-agent"
+          continue: false
+
+        - match:
+            alertname: "PodNotReady"
+          receiver: "alert-agent"
+          continue: false
+
+        - match:
+            alertname: "PodOOMKilled"
+          receiver: "alert-agent"
+          continue: false
+
+        # 🚨 Critical system alerts (optional - Discord or others)
         - match:
             severity: "critical"
           receiver: "discord"
+          continue: false
 
     receivers:
-      - name: "default"
-        webhook_configs:
-          - url: "http://alert-agent.observability.svc.cluster.local:8000/alert"
-            send_resolved: true
+      # ------------------------
+      # 🚫 Default (ignore)
+      # ------------------------
+      - name: "null"
 
+      # ------------------------
+      # 🤖 Alert-Agent Receiver
+      # ------------------------
       - name: "alert-agent"
         webhook_configs:
           - url: "http://alert-agent.observability.svc.cluster.local:8000/alert"
             send_resolved: true
 
+      # ------------------------
+      # 💬 Discord Receiver
+      # ------------------------
       - name: "discord"
         webhook_configs:
           - url: "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz"
@@ -42,5 +76,8 @@ stringData:
           severity: "critical"
         target_match:
           severity: "warning"
-        equal: ["alertname", "namespace"]
+      - source_match:
+          alertname: "Watchdog"
+        target_match:
+          alertname: "TargetDown"
 
