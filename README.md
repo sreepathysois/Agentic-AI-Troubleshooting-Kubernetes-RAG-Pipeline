@@ -123,3 +123,6 @@ curl -X POST http://localhost:8001/analyze \
 
 curl -X POST http://localhost:8000/alert      -H "Content-Type: application/json"      -d @sample_alert.json
 
+
+kubectl create secret generic openai-secret -n observability --from-literal=api-key="sk-your-real-api-key"
+
