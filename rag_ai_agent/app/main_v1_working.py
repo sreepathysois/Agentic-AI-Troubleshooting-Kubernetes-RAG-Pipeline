@@ -14,9 +14,14 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from pgvector.sqlalchemy import Vector
-from sentence_transformers import SentenceTransformer
+#from pgvector.sqlalchemy import register_vector
 
+import numpy as np
 import openai
+from sentence_transformers import SentenceTransformer
+from typing import List
+from sqlalchemy import text
+from typing import List, Dict, Any
 
 # -------------------------------------------------------------------
 # Configuration
@@ -28,15 +33,20 @@ PG_DB = os.getenv("PG_DB", "postgres")
 PG_USER = os.getenv("PG_USER", "postgres")
 PG_PASSWORD = os.getenv("PG_PASSWORD", "postgres123")
 
-REM_AGENT_URL = os.getenv("REM_AGENT_URL", "http://remediation-agent.observability.svc.cluster.local:8002/execute")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
+MINIO_BUCKET = os.getenv("MINIO_BUCKET", "playbooks")
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio.observability.svc.cluster.local:9000")
 
 DB_URL = f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}"
 
 engine = create_engine(DB_URL)
+#register_vector(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 hf_model = SentenceTransformer("all-MiniLM-L6-v2")
-openai.api_key = os.getenv("OPENAI_API_KEY")
+
+openai.api_key = OPENAI_API_KEY
+#openai.api_key = "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"
 
 # -------------------------------------------------------------------
 # FastAPI app setup
@@ -51,6 +61,7 @@ events: List[str] = []
 
 
 def add_event(message: str):
+    """Append event messages for dashboard display."""
     ts = datetime.now().strftime("[%H:%M:%S]")
     msg = f"{ts} {message}"
     print(msg)
@@ -62,20 +73,36 @@ def add_event(message: str):
 # -------------------------------------------------------------------
 # Utility functions
 # -------------------------------------------------------------------
+#def get_embedding(text: str) -> List[float]:
+#    """Generate text embedding using OpenAI model."""
+#    if not text:
+#        return [0.0] * 384
+#    try:
+#        resp = openai.embeddings.create(model="text-embedding-3-small", input=text)
+#        return resp.data[0].embedding
+#    except Exception as e:
+#        add_event(f"❌ Error generating embedding: {e}")
+#        return [0.0] * 384
+
 def get_embedding(text: str) -> List[float]:
     """Generate text embedding using local SentenceTransformer (MiniLM)."""
     if not text:
         return [0.0] * 384
+
     try:
         vector = hf_model.encode(text)
+        if isinstance(vector, list):
+            return vector
         return vector.tolist()
     except Exception as e:
         add_event(f"❌ Error generating embedding (HF model): {e}")
         return [0.0] * 384
 
 
+
 def fetch_playbooks_from_minio() -> List[Dict[str, str]]:
     """Mock or actual fetch of playbooks from MinIO."""
+    # For now we simulate with dummy playbooks
     playbooks = [
         {
             "key": "PodImagePullError",
@@ -92,6 +119,7 @@ def fetch_playbooks_from_minio() -> List[Dict[str, str]]:
 
 def build_context(similar_rows: List[Dict[str, Any]], playbooks: List[Dict[str, str]], current_alert: Dict[str, Any]) -> str:
     """Build combined context for LLM from alert, past alerts, and playbooks."""
+
     def serialize(obj):
         if isinstance(obj, datetime):
             return obj.isoformat()
@@ -136,10 +164,42 @@ def build_context(similar_rows: List[Dict[str, Any]], playbooks: List[Dict[str, 
     return "\n\n".join(parts)
 
 
+#async def query_similar_alerts(embedding: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
+#    """Query PGVector DB for similar alerts."""
+#    try:
+#        with engine.connect() as conn:
+#            q = text("""
+#                SELECT id, alert_name, instance, namespace, created_at, logs,
+#                       1 - (embedding <=> (:embed)::vector) AS similarity,
+#                       (embedding <=> (:embed)::vector) AS distance
+#                FROM alert_enriched
+#                ORDER BY embedding <=> (:embed)::vector
+#                LIMIT :k
+#            """)
+            #q = text("""
+            #    SELECT id, alert_name, instance, namespace, created_at, logs,
+            #           1 - (embedding <=> :embed) AS similarity,
+            #           (embedding <=> :embed) AS distance
+            #    FROM alert_enriched
+            #    ORDER BY embedding <=> :embed
+            #    LIMIT :k
+            #""")
+#            res = conn.execute(q, {"embed": embedding, "k": top_k})
+#            rows = [dict(r._mapping) for r in res]
+#            add_event(f"🔍 Found {len(rows)} similar alerts.")
+#            return rows
+#    except Exception as e:
+#        add_event(f"❌ DB similarity query failed: {e}")
+#        return []
+
+
+
 async def query_similar_alerts(embedding: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
     """Query PGVector DB for similar alerts."""
     try:
+        # Convert embedding to Postgres vector literal string
         embed_str = "[" + ",".join(map(str, embedding)) + "]"
+
         with engine.connect() as conn:
             q = text("""
                 SELECT id, alert_name, instance, namespace, created_at, logs,
@@ -153,6 +213,7 @@ async def query_similar_alerts(embedding: List[float], top_k: int = 3) -> List[D
             rows = [dict(r._mapping) for r in res]
             add_event(f"🔍 Found {len(rows)} similar alerts.")
             return rows
+
     except Exception as e:
         add_event(f"❌ DB similarity query failed: {e}")
         return []
@@ -178,52 +239,15 @@ async def ask_llm(prompt: str) -> str:
 
 
 # -------------------------------------------------------------------
-# NEW: Save analysis to Postgres
-# -------------------------------------------------------------------
-def save_to_db(alert_name: str, instance: str, namespace: str, severity: str, context: str, llm_text: str, embedding: List[float]):
-    try:
-        embed_str = "[" + ",".join(map(str, embedding)) + "]"
-        with engine.begin() as conn:
-            conn.execute(
-                text("""
-                    INSERT INTO rag_alert_analysis 
-                    (alert_name, instance, namespace, severity, context, llm_suggestion, embedding, created_at)
-                    VALUES (:a, :i, :n, :s, :c, :l, (:e)::vector, NOW())
-                """),
-                {"a": alert_name, "i": instance, "n": namespace, "s": severity, "c": context, "l": llm_text, "e": embed_str}
-            )
-        add_event("💾 Stored RAG analysis in Postgres.")
-    except Exception as e:
-        add_event(f"❌ Failed to store analysis: {e}")
-
-
-# -------------------------------------------------------------------
-# NEW: Trigger remediation agent
-# -------------------------------------------------------------------
-async def trigger_remediation(alert: Dict[str, Any], suggestion: str):
-    """Trigger remediation agent with alert labels and LLM suggestion."""
-    try:
-        payload = {
-            "request_id": f"{alert.get('alert_name')}-{int(datetime.utcnow().timestamp())}",
-            "alert_labels": alert,
-            "llm_suggestion": suggestion,
-            "source": "rag-agent"
-        }
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            res = await client.post(REM_AGENT_URL, json=payload)
-            if res.status_code in [200, 202]:
-                add_event(f"🚀 Triggered remediation-agent successfully.")
-            else:
-                add_event(f"⚠️ Failed to trigger remediation-agent: {res.status_code} {res.text}")
-    except Exception as e:
-        add_event(f"❌ Error triggering remediation-agent: {e}")
-
-
-# -------------------------------------------------------------------
 # Routes
 # -------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request, "events": events})
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request, "events": events})
 
 
@@ -251,38 +275,48 @@ async def analyze(payload: Dict[str, Any]):
         "timestamp": datetime.utcnow()
     }
 
+    # Step 1: Create embedding
     embed = get_embedding(f"{alert_name} {instance} {namespace} {severity}")
+
+    # Step 2: Query similar past alerts
     similar_rows = await query_similar_alerts(embed)
+
+    # Step 3: Load playbooks / runbooks
     playbooks = fetch_playbooks_from_minio()
 
+    # Step 4: Build context and query LLM
     context = build_context(similar_rows, playbooks, current_alert)
-    context_preview = context if len(context) < 5000 else context[:5000] + "\n...[truncated]..."
+    #add_event("🧠 Context built for LLM:")
+    #add_event(context[:1000] + "..." if len(context) > 1000 else context)
+
+    # Display context (formatted and limited)
+    context_preview = context if len(context) < 5000 else context[:5000] + "\n\n...[truncated]..."
 
     print("\n========================= 🧠 CONTEXT BUILT =========================")
     print(context_preview)
     print("==================================================================\n")
 
-    add_event("🧩 Context prepared for LLM.")
+    add_event("🧩 Context prepared for LLM:")
     add_event("<pre style='font-size:12px;white-space:pre-wrap;max-height:400px;overflow:auto;'>" +
            context_preview + "</pre>")
+
     llm_reply = await ask_llm(context)
 
-    # NEW: Save and trigger remediation
-    save_to_db(alert_name, instance, namespace, severity, context, llm_reply, embed)
-    await trigger_remediation(current_alert, llm_reply)
-
     add_event("💡 Suggested Fix / Explanation:")
-    add_event(llm_reply[:500])
-    return {"status": "ok", "suggestion": llm_reply}
+    add_event(llm_reply[:500])  # display summary in dashboard
 
+    return {"status": "ok", "suggestion": llm_reply}
 
 @app.post("/clear")
 async def clear_events():
     global events
     events = []
-    return {"status": "cleared"}
+    return {"status": "cleared", "message": "Dashboard events reset"}
 
 
+# -------------------------------------------------------------------
+# Start server
+# -------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
