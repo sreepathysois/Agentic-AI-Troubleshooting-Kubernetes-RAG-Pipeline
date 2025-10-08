@@ -222,4 +222,19 @@ Playbook Excerpt:
 ... 
 
 
-openapi : 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
+openapi : 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  
+
+
+### postgre leraning and storing prompt suggestion table schema
+
+CREATE TABLE IF NOT EXISTS rag_alert_analysis (
+    id SERIAL PRIMARY KEY,
+    alert_name TEXT,
+    instance TEXT,
+    namespace TEXT,
+    severity TEXT,
+    context TEXT,           -- the full prompt sent to LLM
+    llm_suggestion TEXT,    -- LLM full response
+    embedding VECTOR(384),  -- optional semantic vector
+    created_at TIMESTAMP DEFAULT NOW()
+);
