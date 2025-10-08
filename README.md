@@ -237,4 +237,22 @@ CREATE TABLE IF NOT EXISTS rag_alert_analysis (
     llm_suggestion TEXT,    -- LLM full response
     embedding VECTOR(384),  -- optional semantic vector
     created_at TIMESTAMP DEFAULT NOW()
+);  
+
+
+### remediation audit postgres vector schema
+
+CREATE TABLE IF NOT EXISTS remediation_audit (
+  id SERIAL PRIMARY KEY,
+  request_id TEXT,
+  alert_id TEXT,
+  alert_name TEXT,
+  namespace TEXT,
+  pod TEXT,
+  severity TEXT,
+  llm_suggestion TEXT,
+  parsed_commands JSONB,
+  overall_status TEXT,      -- pending | running | completed | failed | partial
+  minio_path TEXT,
+  created_at TIMESTAMP DEFAULT now()
 );
