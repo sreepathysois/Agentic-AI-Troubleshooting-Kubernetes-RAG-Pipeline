@@ -3,6 +3,8 @@ kind: Secret
 metadata:
   name: alertmanager-prometheus-kube-prometheus-alertmanager
   namespace: monitoring
+  labels:
+    release: prometheus
 stringData:
   alertmanager.yaml: |-
     global:
