@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+kubernetes
+boto3
+sqlalchemy
+psycopg2-binary
+httpx
+python-dotenv
+pydantic
+
