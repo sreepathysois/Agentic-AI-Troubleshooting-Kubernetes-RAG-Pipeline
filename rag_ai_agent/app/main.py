@@ -201,23 +201,49 @@ def save_to_db(alert_name: str, instance: str, namespace: str, severity: str, co
 # NEW: Trigger remediation agent
 # -------------------------------------------------------------------
 async def trigger_remediation(alert: Dict[str, Any], suggestion: str):
-    """Trigger remediation agent with alert labels and LLM suggestion."""
+    """Trigger remediation agent with alert labels and LLM suggestion (safe JSON)."""
     try:
+        # ---- Build base payload ----
         payload = {
-            #"request_id": f"{alert.get('alert_name')}-{int(datetime.utcnow().timestamp())}",
-            "request_id": f"{alert.get('alert_name')}",
+            "request_id": f"{alert.get('alert_name')}-{alert.get('instance', alert.get('pod', 'unknown'))}",
+            "alert_id": alert.get("instance", alert.get("pod", "unknown")),
             "alert_labels": alert,
             "llm_suggestion": suggestion,
-            "source": "rag-agent"
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            res = await client.post(REM_AGENT_URL, json=payload)
-            if res.status_code in [200, 202]:
-                add_event(f"🚀 Triggered remediation-agent successfully.")
+
+        # ---- Make payload JSON safe ----
+        def json_safe(obj):
+            if isinstance(obj, dict):
+                return {k: json_safe(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [json_safe(v) for v in obj]
+            elif isinstance(obj, datetime):
+                return obj.isoformat()
             else:
-                add_event(f"⚠️ Failed to trigger remediation-agent: {res.status_code} {res.text}")
+                try:
+                    json.dumps(obj)
+                    return obj
+                except TypeError:
+                    return str(obj)
+
+        safe_payload = json_safe(payload)
+
+        # ---- Send to remediation agent ----
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                "http://remediation-agent.observability.svc.cluster.local:8002/execute",
+                json=safe_payload
+            )
+
+        if resp.status_code == 200:
+            add_event("🚀 Triggered remediation-agent successfully.")
+        else:
+            add_event(f"⚠️ Remediation-agent returned {resp.status_code}: {resp.text}")
+
     except Exception as e:
         add_event(f"❌ Error triggering remediation-agent: {e}")
+
+
 
 
 # -------------------------------------------------------------------
