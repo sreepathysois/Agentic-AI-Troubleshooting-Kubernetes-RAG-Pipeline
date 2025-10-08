@@ -204,7 +204,8 @@ async def trigger_remediation(alert: Dict[str, Any], suggestion: str):
     """Trigger remediation agent with alert labels and LLM suggestion."""
     try:
         payload = {
-            "request_id": f"{alert.get('alert_name')}-{int(datetime.utcnow().timestamp())}",
+            #"request_id": f"{alert.get('alert_name')}-{int(datetime.utcnow().timestamp())}",
+            "request_id": f"{alert.get('alert_name')}",
             "alert_labels": alert,
             "llm_suggestion": suggestion,
             "source": "rag-agent"
