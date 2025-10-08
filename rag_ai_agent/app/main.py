@@ -18,17 +18,22 @@ from pgvector.sqlalchemy import Vector
 
 import numpy as np
 import openai
+from sentence_transformers import SentenceTransformer
+from typing import List
+from sqlalchemy import text
+from typing import List, Dict, Any
 
 # -------------------------------------------------------------------
 # Configuration
 # -------------------------------------------------------------------
 PG_HOST = os.getenv("PG_HOST", "postgres-service.observability.svc.cluster.local")
+#PG_HOST = os.getenv("PG_HOST", "10.102.23.183")
 PG_PORT = os.getenv("PG_PORT", "5432")
 PG_DB = os.getenv("PG_DB", "postgres")
 PG_USER = os.getenv("PG_USER", "postgres")
 PG_PASSWORD = os.getenv("PG_PASSWORD", "postgres123")
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "playbooks")
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio.observability.svc.cluster.local:9000")
 
@@ -37,6 +42,8 @@ DB_URL = f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG
 engine = create_engine(DB_URL)
 #register_vector(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+hf_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 openai.api_key = OPENAI_API_KEY
 #openai.api_key = "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"
@@ -66,16 +73,31 @@ def add_event(message: str):
 # -------------------------------------------------------------------
 # Utility functions
 # -------------------------------------------------------------------
+#def get_embedding(text: str) -> List[float]:
+#    """Generate text embedding using OpenAI model."""
+#    if not text:
+#        return [0.0] * 384
+#    try:
+#        resp = openai.embeddings.create(model="text-embedding-3-small", input=text)
+#        return resp.data[0].embedding
+#    except Exception as e:
+#        add_event(f"❌ Error generating embedding: {e}")
+#        return [0.0] * 384
+
 def get_embedding(text: str) -> List[float]:
-    """Generate text embedding using OpenAI model."""
+    """Generate text embedding using local SentenceTransformer (MiniLM)."""
     if not text:
         return [0.0] * 384
+
     try:
-        resp = openai.embeddings.create(model="text-embedding-3-small", input=text)
-        return resp.data[0].embedding
+        vector = hf_model.encode(text)
+        if isinstance(vector, list):
+            return vector
+        return vector.tolist()
     except Exception as e:
-        add_event(f"❌ Error generating embedding: {e}")
+        add_event(f"❌ Error generating embedding (HF model): {e}")
         return [0.0] * 384
+
 
 
 def fetch_playbooks_from_minio() -> List[Dict[str, str]]:
@@ -142,9 +164,42 @@ def build_context(similar_rows: List[Dict[str, Any]], playbooks: List[Dict[str, 
     return "\n\n".join(parts)
 
 
+#async def query_similar_alerts(embedding: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
+#    """Query PGVector DB for similar alerts."""
+#    try:
+#        with engine.connect() as conn:
+#            q = text("""
+#                SELECT id, alert_name, instance, namespace, created_at, logs,
+#                       1 - (embedding <=> (:embed)::vector) AS similarity,
+#                       (embedding <=> (:embed)::vector) AS distance
+#                FROM alert_enriched
+#                ORDER BY embedding <=> (:embed)::vector
+#                LIMIT :k
+#            """)
+            #q = text("""
+            #    SELECT id, alert_name, instance, namespace, created_at, logs,
+            #           1 - (embedding <=> :embed) AS similarity,
+            #           (embedding <=> :embed) AS distance
+            #    FROM alert_enriched
+            #    ORDER BY embedding <=> :embed
+            #    LIMIT :k
+            #""")
+#            res = conn.execute(q, {"embed": embedding, "k": top_k})
+#            rows = [dict(r._mapping) for r in res]
+#            add_event(f"🔍 Found {len(rows)} similar alerts.")
+#            return rows
+#    except Exception as e:
+#        add_event(f"❌ DB similarity query failed: {e}")
+#        return []
+
+
+
 async def query_similar_alerts(embedding: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
     """Query PGVector DB for similar alerts."""
     try:
+        # Convert embedding to Postgres vector literal string
+        embed_str = "[" + ",".join(map(str, embedding)) + "]"
+
         with engine.connect() as conn:
             q = text("""
                 SELECT id, alert_name, instance, namespace, created_at, logs,
@@ -154,18 +209,11 @@ async def query_similar_alerts(embedding: List[float], top_k: int = 3) -> List[D
                 ORDER BY embedding <=> (:embed)::vector
                 LIMIT :k
             """)
-            #q = text("""
-            #    SELECT id, alert_name, instance, namespace, created_at, logs,
-            #           1 - (embedding <=> :embed) AS similarity,
-            #           (embedding <=> :embed) AS distance
-            #    FROM alert_enriched
-            #    ORDER BY embedding <=> :embed
-            #    LIMIT :k
-            #""")
-            res = conn.execute(q, {"embed": embedding, "k": top_k})
+            res = conn.execute(q, {"embed": embed_str, "k": top_k})
             rows = [dict(r._mapping) for r in res]
             add_event(f"🔍 Found {len(rows)} similar alerts.")
             return rows
+
     except Exception as e:
         add_event(f"❌ DB similarity query failed: {e}")
         return []
@@ -258,6 +306,12 @@ async def analyze(payload: Dict[str, Any]):
     add_event(llm_reply[:500])  # display summary in dashboard
 
     return {"status": "ok", "suggestion": llm_reply}
+
+@app.post("/clear")
+async def clear_events():
+    global events
+    events = []
+    return {"status": "cleared", "message": "Dashboard events reset"}
 
 
 # -------------------------------------------------------------------
