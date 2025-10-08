@@ -255,4 +255,23 @@ CREATE TABLE IF NOT EXISTS remediation_audit (
   overall_status TEXT,      -- pending | running | completed | failed | partial
   minio_path TEXT,
   created_at TIMESTAMP DEFAULT now()
-);
+);  
+
+
+### Test Remediation agent
+
+curl -X POST http://remediation-agent.observability.svc.cluster.local:8002/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "req-123",
+    "alert_id": "pathy-7f884d8546-n69rs",
+    "alert_labels": {
+      "alertname": "PodImagePullError",
+      "namespace": "default",
+      "pod": "pathy-7f884d8546-n69rs",
+      "severity": "warning"
+    },
+    "llm_suggestion": "The pod failed to pull image. Try:\n1) kubectl describe pod pathy-7f884d8546-n69rs -n default\n2) kubectl delete pod pathy-7f884d8546-n69rs -n default",
+    "approval_required": false
+  }'
+
